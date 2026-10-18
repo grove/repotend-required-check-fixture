@@ -47,6 +47,29 @@ jobs:
             comparisons: [.comparisons[] | {jobId, checkName, status, conclusion, matches}],
             localProblems
           }' verification.json
+      - name: Assert positive required-check name match
+        run: |
+          # A positive match can be verified even if classic branch protection is unreadable.
+          # Do not claim Optional is globally nonrequired when classic protection is inaccessible.
+          jq -e '
+            .mode == "github-context" and
+            .repository == "grove/repotend-required-check-fixture" and
+            .branch == "main" and
+            ((.localProblems | length) == 0) and
+            any(.comparisons[];
+              .jobId == "tests" and
+              .checkName == "Tests" and
+              .status == "remote-verified" and
+              .conclusion == "required-check-name-matches-filtered-job" and
+              any(.matches[];
+                .context == "Tests" and .policy == "ruleset:25349331")
+            ) and
+            any(.comparisons[];
+              .jobId == "optional" and
+              .checkName == "Optional" and
+              ((.matches | length) == 0)
+            )
+          ' verification.json
       - name: Upload sanitized JSON evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
