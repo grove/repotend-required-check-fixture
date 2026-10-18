@@ -1,0 +1,22 @@
+name: Filtered CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Tests passed"
+
+  optional:
+    name: Optional
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Optional passed"
