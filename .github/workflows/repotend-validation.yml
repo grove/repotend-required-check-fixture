@@ -1,0 +1,60 @@
+name: RepoTend fixture acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repotend-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout disposable fixture
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: fixture
+          persist-credentials: false
+      - name: Checkout pinned RepoTend source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: grove/repotend
+          ref: 2acb4abef7c99971ac2fde4143a48f2724eaf106
+          path: repotend
+          persist-credentials: false
+      - name: Use Node 22.16
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Run offline RepoTend audit
+        run: |
+          node repotend/skills/repotend/scripts/audit.mjs --root fixture --format json > audit.json
+          jq -e '.errors | length == 0' audit.json
+          jq -e 'any(.findings[]; .ruleId == "ci.path-filter-safety" and .status == "WARN")' audit.json
+          jq '{mode, findings: [.findings[] | {ruleId, status, confidence}]}' audit.json
+      - name: Run separately authorized read-only GitHub context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node repotend/skills/repotend/scripts/verify-github.mjs \
+            --root fixture --repo grove/repotend-required-check-fixture \
+            --branch main --allow-remote > verification.json
+          jq '{
+            status, requiredCheckConfigurationComplete,
+            policies: [.policies[] | {endpoint, status, reason, checks}],
+            comparisons: [.comparisons[] | {jobId, checkName, status, conclusion, matches}],
+            localProblems
+          }' verification.json
+      - name: Upload sanitized JSON evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: repotend-fixture-acceptance
+          path: |
+            audit.json
+            verification.json
+          if-no-files-found: warn
