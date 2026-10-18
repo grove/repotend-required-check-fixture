@@ -2,7 +2,7 @@ name: RepoTend fixture acceptance
 
 on:
   push:
-    branches: [main]
+    branches: [main, validation-run]
   workflow_dispatch:
 
 permissions:
